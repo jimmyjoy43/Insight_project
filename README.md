@@ -11,7 +11,7 @@ Inspo-book inspires the user to build new outfits around items of clothing the u
 
 
 ## Repo Structure
-(under construction)
+
 + `data`: an example set of images
 + `notebooks`: miscellaneous ipython notebooks
 + `web scrapers`: web scrapers for Reddit using BeautifulSoup, PushShift and the Python Reddit API
