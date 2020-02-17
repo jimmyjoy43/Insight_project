@@ -1,0 +1,309 @@
+import streamlit as st
+st.title('inspo-Book')
+st.header('Upload an item of clothing to find matching looks')
+st.subheader('Jimmy Joy')
+st.subheader('Insight Data Science, Los Angeles')
+
+
+########################################################
+### importing libraries 
+########################################################
+
+import matplotlib.image as mpimg
+import matplotlib.pyplot as plt
+import cv2
+import os
+import numpy as np
+import json
+from PIL import *
+import pandas as pd
+import csv
+import seaborn as sns
+import shutil 
+import matplotlib.gridspec as gridspec
+
+
+from sklearn import metrics
+from sklearn.metrics import pairwise_distances
+from sklearn import datasets
+from sklearn import preprocessing
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn import preprocessing
+
+import keras_maskrcnn
+import keras_retinanet 
+
+from keras_maskrcnn import models
+from keras_maskrcnn.utils.visualization import draw_mask
+from keras_retinanet.utils.visualization import draw_box, draw_caption, draw_annotations
+from keras_retinanet.utils.image import read_image_bgr, preprocess_image, resize_image
+from keras_retinanet.utils.colors import label_color
+
+###########################################################
+### uploading the image ###
+###########################################################
+
+upload = st.file_uploader('Upload an picture of the item you are trying to match')
+if upload is not None:
+    image1 = Image.open(upload)
+    st.image(image1, caption='Uploaded Image.', width = 400)
+
+##### User input of number of similar outfits to find
+
+number = st.number_input('How many similar outfits would you like to see?', value = 0, step = 1)
+
+###########################################################
+### TF model
+###########################################################
+
+import keras 
+from keras import backend as K
+import tensorflow as tf
+def get_session():
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    return tf.Session(config=config)
+
+# set the modified tf session as backend in keras
+keras.backend.tensorflow_backend.set_session(get_session())
+
+
+# adjust this to point to your downloaded/trained model
+model_path = os.path.join('/home/ec2-user/inspo', 'resnet50_modanet.h5')
+
+# load retinanet model
+model = models.load_model(model_path, backbone_name='resnet50')
+#print(model.summary())
+
+# load label to names mapping for visualization purposes
+labels_to_names = {1: 'bag', 2: 'belt', 3: 'boots', 4: 'footwear', 5: 'outer', 6: 'dress', 7: 'sunglasses', 8: 'pants', 9: 'top', 10: 'shorts', 11: 'skirt', 12: 'headwear', 13: 'scarf/tie'}
+
+### feature extraction from test image ###
+def cloth_identifier_extract_text(input_imagefile):
+  # load image
+  image = read_image_bgr(input_imagefile)
+
+  # copy to draw on
+  draw = image.copy()
+  draw = cv2.cvtColor(draw, cv2.COLOR_BGR2RGB)
+
+  # preprocess image for network
+  image = preprocess_image(image)
+  image, scale = resize_image(image)
+
+  # process image
+  outputs1 = model.predict_on_batch(np.expand_dims(image, axis=0))
+
+  boxes  = outputs1[-4][0]
+  scores = outputs1[-3][0]
+  labels = outputs1[-2][0]
+  masks  = outputs1[-1][0]
+
+  # correct for image scale
+  boxes /= scale
+
+  masks_dic={}
+  boxes_dic={}
+  labels_dic={}
+  counter=0
+
+  # visualize detections
+  for box, score, label, mask in zip(boxes, scores, labels, masks):
+    if score < 0.5:
+        break
+    
+
+    color = label_color(label)
+    
+    b = box.astype(int)
+    draw_box(draw, b, color=color)
+    
+    mask = mask[:, :, label]
+    draw_mask(draw, b, mask, color=label_color(label))
+    
+    masks_dic[str(counter)]=mask
+    boxes_dic[str(counter)]=box
+    labels_dic[str(counter)]=label
+    counter+=1
+
+
+  items_dic={}
+  counter=0
+  masks=[]
+  for box, mask, label in zip(boxes_dic.values(), masks_dic.values(), labels_dic.values()):
+
+    b = box.astype(int)
+
+    # resize to fit the box
+    mask = mask.astype(np.float32)
+    mask = cv2.resize(mask, (b[2] - b[0], b[3] - b[1]))
+
+    # binarize the mask
+    mask = (mask > 0.5).astype(np.uint8)
+
+    # draw the mask in the image
+    mask_image = np.zeros((draw.shape[0], draw.shape[1]), np.uint8)
+    mask_image[b[1]:b[3], b[0]:b[2]] = mask
+    mask = mask_image
+
+    mask = (np.stack([mask] * 3, axis = 2))*draw
+
+    items_dic[str(counter)] = mask
+    counter+=1
+
+  return mask, label
+
+### User image identification and extraction 
+
+test_mask, label =cloth_identifier_extract_text(upload)
+
+label_name=labels_to_names[label+1]
+
+## Converting the extracted np array to an image 
+
+from PIL import Image
+testimg = Image.fromarray(test_mask, 'RGB')
+
+## Converting test image to feature vector 
+
+from keras.preprocessing import image
+from keras.applications.inception_v3 import InceptionV3
+from keras.applications.inception_v3 import preprocess_input
+import numpy as np
+
+model = InceptionV3(weights='imagenet', pooling = 'avg', include_top=False)
+
+#model.summary()
+from keras import Model
+model1 = Model(inputs=model.inputs, outputs=model.layers[311].output)
+
+####################
+img_data = image.img_to_array(testimg)
+img_data = np.expand_dims(img_data, axis=0)
+img_data = preprocess_input(img_data)
+testfeature = model1.predict(img_data)
+
+## loading the reddit images dataframe 
+
+mf_features = pd.read_csv('new_features_names.csv', index_col='names')
+
+### conv test feature vector to pd series
+testfeature = testfeature.reshape(1, -1)
+testfeature = testfeature.reshape(2048,)
+testfeature = np.append(testfeature, label)
+testfeature = np.append(testfeature, label)
+testfeature = pd.Series(testfeature, index = mf_features.columns, name = 'test')
+
+### apeending test vector with  features daatframe
+
+features_withtest = mf_features.append(testfeature)
+
+### replace test label name with name instead of number 
+
+features_withtest['label names'][features_withtest['label names'] == features_withtest['label names']['test'] ] = labels_to_names[features_withtest['label names']['test']+1]
+
+### Scaling the features datafram 
+
+mm_scaler = preprocessing.MinMaxScaler()
+features_withtest.loc[:,'0':'2047'] = mm_scaler.fit_transform(features_withtest.loc[:,'0':'2047'])
+
+## new df with test and train images of same class
+
+sample_df = features_withtest.loc[features_withtest['labels'] == label]
+
+
+######################################################################
+### cosine similarity 
+#####################################################################
+
+### Cosine similarities between test and all train images of sample
+from sklearn.metrics.pairwise import cosine_similarity
+cos_val = cosine_similarity(sample_df.iloc[:, :2048], sample_df.iloc[-1:, :2048])
+
+cos_val=cos_val.reshape(-1,)
+
+sample_df['cosine'] = pd.Series(cos_val, index=sample_df.index)
+
+sample_df_sort=sample_df.sort_values(by=['cosine'], ascending = False)
+
+#####################################################################
+### Euclidean distance
+#####################################################################
+
+## Euclidean distance
+## new df with test and train images of same class
+
+#sample_df = features_withtest.loc[features_withtest['labels'] == label]
+#sample_df.head()
+
+### Euclidean distances between test and all train images of sample
+#from sklearn.metrics.pairwise import euclidean_distances
+#euc_dis = euclidean_distances(sample_df.iloc[:, :2048], sample_df.iloc[-1:, :2048])
+
+#euc_dis=euc_dis.reshape(-1,)
+
+#sample_df['euclidean'] = pd.Series(euc_dis, index=sample_df.index)
+
+#sample_df_sort=sample_df.sort_values(by=['euclidean'], ascending = True)
+
+#######################################################################
+### Manhattan Distance
+#######################################################################
+
+## Manhattan distances
+
+## new df with test and train images of same class
+
+#sample_df = features_withtest.loc[features_withtest['labels'] == label]
+#print(sample_df.shape)
+
+### Manhattan distances between test and all train images of sample
+#from sklearn.metrics.pairwise import manhattan_distances
+#man_dis = manhattan_distances(sample_df.iloc[:, :2048], sample_df.iloc[-1:, :2048])
+
+#man_dis = man_dis.reshape(-1,)
+
+#sample_df['manhattan'] = pd.Series(man_dis, index=sample_df.index)
+
+#sample_df_sort=sample_df.sort_values(by=['manhattan'], ascending = True)
+
+########################################################################
+### Output images
+#######################################################################
+
+
+#imageI=[]
+#for i in range(number+1):
+# if i > 0:
+#  print(str(sample_df_sort.index[i]).split('-')[0]+'.jpg')
+#  imageI.append(mpimg.imread('/home/ec2-user/inspo/processedimages/'+str(sample_df_sort.index[i]).split('-')[0]+'.jpg'))
+  #plt.imshow(ImageI)
+  #plt.show()
+
+#st.image(imageI, width=400)
+
+#fig= plt.figure(figsize=(24,24))
+
+#for i in range(number+1):
+ #   if i > 0:
+  #      plt.subplot((number//3)+1,3,i)
+   #     plt.axis('off')
+    #    plt.imshow(mpimg.imread('/home/ec2-user/inspo/processedimages/'+str(sample_df_sort.index[i]).split('-')[0]+'.jpg'))
+
+#st.pyplot()
+        
+fig5 = plt.figure(constrained_layout=True,figsize=(12,12))
+
+spec5 = gridspec.GridSpec(ncols=3, nrows=1+number//3)
+spec5.update(wspace=0.0, hspace=0.0, top=0.95, bottom=0.05, left=0.17, right=0.845) 
+counter=1
+for row in range(1+number//3):
+    for col in range(3):
+        if counter < 1+number:
+            ax = fig5.add_subplot(spec5[row, col])
+            ax.imshow(mpimg.imread('/home/ec2-user/inspo/processedimages/'+str(sample_df_sort.index[counter]).split('-')[0]+'.jpg'))
+            ax.axis('off')
+            counter+=1
+
+st.pyplot()
