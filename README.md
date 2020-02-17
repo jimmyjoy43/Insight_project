@@ -12,7 +12,7 @@ Inspo-book inspires the user to build new outfits around items of clothing the u
 
 ## Repo Structure
 
-+ `inspo`: contains the Streamlit python file tp run inspo-book 
++ `inspo`: contains the Streamlit python file to run inspo-book 
 + `notebooks`: miscellaneous ipython notebooks
 + `web scrapers`: web scrapers for Reddit using BeautifulSoup, PushShift and the Python Reddit API
 
