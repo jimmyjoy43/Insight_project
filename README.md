@@ -19,3 +19,5 @@ Inspo-book inspires the user to build new outfits around items of clothing the u
 
 ## License
 Unless explicitly stated at the top of a file, all code is licensed under the MIT license.
+Modanet data set is released under the Creative Commons Attribution-NonCommercial license 4.0 by Shuai Zheng, Fan Yang, M. Hadi Kiapour, Robinson Piramuthu. ModaNet: A Large-Scale Street Fashion Dataset with Polygon Annotations. ACM Multimedia, 2018
+The iMaterialist data set can be obtained from: https://github.com/visipedia/imat_fashion_comp
