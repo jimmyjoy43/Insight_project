@@ -15,7 +15,7 @@ Inspo-book inspires the user to build new outfits around items of clothing the u
 + `data`: an example set of images
 + `notebooks`: miscellaneous ipython notebooks
 + `web scrapers`: web scrapers for Reddit using BeautifulSoup, PushShift and the Python Reddit API
-+ `AlexNet`: AlexNet files and training data from iMaterialist 2018
+
 
 ## License
 Unless explicitly stated at the top of a file, all code is licensed under the MIT license.
