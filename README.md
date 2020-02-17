@@ -8,7 +8,7 @@ color and texture using a convolutional neural network. Inspo-book them compares
 images scrapped from Reddit to recommend the three outfits that have an item closely matching the user's input. In this manner, 
 Inspo-book inspires the user to build new outfits around items of clothing the user already has in their closet. 
 
-
+![inspo](inspo.gif)
 
 ## Repo Structure
 
