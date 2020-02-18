@@ -39,9 +39,8 @@ The script doing the work is app.py (for features extracted using InceptionV3 ne
 
 ```
 streamlit run app2.py
-
 ```
-And following the external URL Streamlit provides. 
+And follow the external URL Streamlit provides. 
 
 ## License
 Unless explicitly stated at the top of a file, all code is licensed under the MIT license.
