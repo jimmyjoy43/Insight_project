@@ -70,7 +70,7 @@ Pillow==7.0.0
 progressbar2==3.47.0
 prometheus-client==0.7.1
 prompt-toolkit==3.0.3
-protobuf==3.11.2
+protobuf==3.15.0
 ptyprocess==0.6.0
 pycparser==2.19
 pydeck==0.2.1
